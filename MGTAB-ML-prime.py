@@ -1,5 +1,6 @@
-from Dataset import Cresci15
+from Dataset import MGTAB
 import numpy as np
+import pandas as pd
 from sklearn.utils import shuffle
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.tree import DecisionTreeClassifier
@@ -13,8 +14,9 @@ from utils import sample_mask
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--models_list', type=int, default=[1,2,3,5], nargs='+', help='selection of classifiers')
-parser.add_argument('--random_seed', type=int, default=[1,2,3,4,5], nargs='+', help='selection of random seeds')
+parser.add_argument('--task', type=str, default='bot', help='detection task of stance or bot')
+parser.add_argument('--models_list', type=int, default=[1,2,3,4,5,6,7,8], nargs='+', help='Selection of classifiers')
+parser.add_argument('--random_seed', type=int, default=[0,1,2,3,4], nargs='+', help='Selection of random seeds')
 args = parser.parse_args()
 print(args)
 
@@ -31,10 +33,21 @@ modelDict = {
 
 
 assert set(args.models_list).issubset(modelDict.keys()), 'models should be choose in modelDict'
-dataset = Cresci15('./Dataset/Cresci-15')
+dataset = MGTAB('./Dataset/MGTAB', prime=True)
 data = dataset[0]
 
-x = np.array(data.x)
+
+if args.task == 'stance':
+    out_dim = 3
+    data.y = data.y1
+else:
+    out_dim = 2
+    data.y = data.y2
+
+
+x = pd.DataFrame(data.x)
+col = x.columns[-1]
+x[col] = x[col].astype(int).astype("category")
 labels = np.array(data.y)
 sample_number = len(labels)
 
@@ -45,24 +58,25 @@ for i in args.models_list:
     f1_list = []
 
     for j in range(len(args.random_seed)):
+
         shuffled_idx = shuffle(np.array(range(sample_number)), random_state=args.random_seed[j])
         train_idx = shuffled_idx[:int(0.7 * sample_number)]
         val_idx = shuffled_idx[int(0.7 * sample_number):int(0.9 * sample_number)]
         test_idx = shuffled_idx[int(0.9 * sample_number):]
-        data.train_mask = sample_mask(train_idx, sample_number)
-        data.val_mask = sample_mask(val_idx, sample_number)
-        data.test_mask = sample_mask(test_idx, sample_number)
+        data.train_mask = sample_mask(train_idx, sample_number).cpu().numpy()
+        data.val_mask = sample_mask(val_idx, sample_number).cpu().numpy()
+        data.test_mask = sample_mask(test_idx, sample_number).cpu().numpy()
 
         x_train = x[data.train_mask]
         y_train = labels[data.train_mask]
         x_test = x[data.test_mask]
         y_test = labels[data.test_mask]
+
         if i == 1:
             clf = AdaBoostClassifier(
                 random_state=args.random_seed[j],
                 n_estimators=50,
-                learning_rate=1.0,
-                algorithm='SAMME.R',
+                learning_rate=1.0
             )
         elif i == 2:
             clf = RandomForestClassifier(
@@ -80,6 +94,8 @@ for i in args.models_list:
             )
         elif i == 4:
             clf = XGBClassifier(
+                tree_method='hist',
+                enable_categorical=True,
                 learning_rate=0.1,
                 random_state=args.random_seed[j],
                 n_estimators=200,
