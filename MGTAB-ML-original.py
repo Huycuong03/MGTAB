@@ -14,7 +14,7 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--task', type=str, default='bot', help='detection task of stance or bot')
-parser.add_argument('--models_list', type=int, default=[1,2,3,5], nargs='+', help='Selection of classifiers')
+parser.add_argument('--models_list', type=int, default=[1,2,3,4,5,6,7,8], nargs='+', help='Selection of classifiers')
 parser.add_argument('--random_seed', type=int, default=[0,1,2,3,4], nargs='+', help='Selection of random seeds')
 args = parser.parse_args()
 print(args)
@@ -74,7 +74,6 @@ for i in args.models_list:
                 random_state=args.random_seed[j],
                 n_estimators=50,
                 learning_rate=1.0,
-                algorithm='SAMME.R',
             )
         elif i == 2:
             clf = RandomForestClassifier(
